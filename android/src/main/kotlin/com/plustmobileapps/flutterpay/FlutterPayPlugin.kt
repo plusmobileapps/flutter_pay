@@ -1,14 +1,17 @@
 package com.plustmobileapps.flutterpay
 
 import android.app.Activity
+import android.content.Intent
+import android.util.Log
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.wallet.*
+import com.google.gson.Gson
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.PluginRegistry.Registrar
-import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.IllegalStateException
 
@@ -18,11 +21,22 @@ const val JCB = "JCB"
 const val MASTERCARD = "MASTERCARD"
 const val VISA = "VISA"
 
+sealed class TokenizationSpecifcationType {
+    abstract val type: String
+
+    data class PaymentGateway(override val type: String = TOKENIZATION_TYPE_PAYMENT_GATEWAY, val gateway: String, val gatewayMerchantId: String) : TokenizationSpecifcationType()
+    data class Direct(override val type: String = TOKENIZATION_TYPE_DIRECT, val protocolVersion: String, val publicKey: String) : TokenizationSpecifcationType()
+}
+
 //flutter method calls
+const val CONFIGURE_GOOGLE_PAY = "configureGooglePay"
 const val CHECK_IS_READY_TO_PAY = "checkIsReadyToPay"
-const val OPEN_GOOGLE_PAY = "openGooglePaySetup"
+const val OPEN_GOOGLE_PAY_SETUP = "openGooglePaySetup"
+const val OPEN_GOOGLE_PAY_TRANSACTION = "openGooglePayTransaction"
 
 //google pay json keys
+const val GOOGLE_PAY_CONFIG = "googlePayConfig"
+const val GOOGLE_PAY_TRANSACTION = "googlePayTransactionInfo"
 const val ALLOWED_AUTH_CARD_METHODS = "allowedAuthMethods"
 const val ALLOWED_CARD_NETWORKS = "allowedCardNetworks"
 
@@ -39,107 +53,8 @@ enum class AllowedCardAuthMethod(name: String) {
     CRYPTOGRAM_3DS("CRYPTOGRAM_3DS")
 }
 
-data class GooglePayConfig(val allowedCards: List<String>, val allowedAuthMethods: List<String>)
 
-class FlutterPayPlugin(private val activity: Activity) : MethodCallHandler {
-
-    private val paymentsClient = Wallet.getPaymentsClient(
-            activity,
-            Wallet.WalletOptions.Builder()
-                    .setEnvironment(WalletConstants.ENVIRONMENT_TEST)
-                    .build())
-
-    private val baseRequest: JSONObject
-        get() = JSONObject().apply {
-            put("apiVersion", 2)
-            put("apiVersionMinor", 0)
-        }
-
-    private var googlePayConfig: GooglePayConfig? = null
-
-    override fun onMethodCall(call: MethodCall, result: Result) {
-        when (call.method) {
-            "getPlatformVersion" -> result.success("Android ${android.os.Build.VERSION.RELEASE}")
-            CHECK_IS_READY_TO_PAY -> checkIsReadyToPay(call, result)
-            OPEN_GOOGLE_PAY -> openGooglePaySetup()
-            else -> result.notImplemented()
-        }
-    }
-
-    private fun checkIsReadyToPay(call: MethodCall, flutterResult: Result) {
-
-        if (!call.hasArgument(ALLOWED_CARD_NETWORKS)) {
-            throw IllegalStateException("method: $CHECK_IS_READY_TO_PAY - had no argument passed for $ALLOWED_CARD_NETWORKS")
-        }
-
-        if (!call.hasArgument(ALLOWED_AUTH_CARD_METHODS)) {
-            throw IllegalStateException("method: $CHECK_IS_READY_TO_PAY - had no argument passed for $ALLOWED_AUTH_CARD_METHODS")
-        }
-
-        val allowedPaymentMethods = call.argument<List<String>>(ALLOWED_CARD_NETWORKS) ?: throw IllegalStateException("No card networks found")
-        val allowedAuthCardMethods = call.argument<List<String>>(ALLOWED_AUTH_CARD_METHODS) ?: throw IllegalStateException("No card auth methods found")
-
-
-        val googlePayConfig = GooglePayConfig(allowedPaymentMethods, allowedAuthCardMethods)
-        this.googlePayConfig = googlePayConfig
-        val request = IsReadyToPayRequest.fromJson(getIsReadyToPayRequest(googlePayConfig).toString())
-        val task = paymentsClient.isReadyToPay(request)
-        task.addOnCompleteListener { task ->
-            try {
-                val result = task.getResult(ApiException::class.java)!!
-                if (result) {
-                    // show Google Pay as a payment option
-                    flutterResult.success(true)
-                }
-            } catch (e: ApiException) {
-                flutterResult.success(false)
-            }
-        }
-    }
-
-
-    private fun getTokenizationSpecification(): JSONObject {
-        val tokenizationSpecification = JSONObject()
-        tokenizationSpecification.put("type", "PAYMENT_GATEWAY")
-        tokenizationSpecification.put(
-                "parameters",
-                JSONObject()
-                        .put("gateway", "example")
-                        .put("gatewayMerchantId", "exampleMerchantId"))
-
-        return tokenizationSpecification
-    }
-
-    private fun getAllowedCardNetworks(cards: List<String>) = JSONArray().apply {
-        cards.forEach { put(it) }
-    }
-
-
-    private fun getAllowedCardAuthMethods(allowedAuthMethods: List<String>) = JSONArray().apply {
-        allowedAuthMethods.forEach { put(it) }
-    }
-
-    private fun getBaseCardPaymentMethod(config: GooglePayConfig): JSONObject {
-        return JSONObject().apply {
-            put("type", "CARD")
-            put("parameters", JSONObject().apply {
-                put(ALLOWED_AUTH_CARD_METHODS, getAllowedCardAuthMethods(config.allowedAuthMethods))
-                put(ALLOWED_CARD_NETWORKS, getAllowedCardNetworks(config.allowedCards))
-            })
-        }
-    }
-
-    private fun getCardPaymentMethod(): JSONObject {
-        val googlePayConfig = googlePayConfig ?: throw IllegalStateException("Google pay config was never setup by calling $CHECK_IS_READY_TO_PAY first")
-        val cardPaymentMethod = getBaseCardPaymentMethod(googlePayConfig)
-        cardPaymentMethod.put("tokenizationSpecification", getTokenizationSpecification())
-
-        return cardPaymentMethod
-    }
-
-    fun getIsReadyToPayRequest(config: GooglePayConfig): JSONObject = baseRequest.apply {
-        put("allowedPaymentMethods", JSONArray().put(getBaseCardPaymentMethod(config)))
-    }
+class FlutterPayPlugin(private val activity: Activity, registrar: Registrar) : MethodCallHandler, PluginRegistry.ActivityResultListener {
 
     companion object {
 
@@ -148,46 +63,136 @@ class FlutterPayPlugin(private val activity: Activity) : MethodCallHandler {
         @JvmStatic
         fun registerWith(registrar: Registrar) {
             MethodChannel(registrar.messenger(), "flutter_pay").apply {
-                setMethodCallHandler(FlutterPayPlugin(registrar.activity()))
+                setMethodCallHandler(FlutterPayPlugin(registrar.activity(), registrar))
             }
         }
 
     }
 
-    private fun getTransactionInfo(): JSONObject {
-        val transactionInfo = JSONObject()
-        transactionInfo.put("totalPrice", "12.34")
-        transactionInfo.put("totalPriceStatus", "FINAL")
-        transactionInfo.put("currencyCode", "USD")
-
-        return transactionInfo
+    init {
+        registrar.addActivityResultListener(this)
     }
 
-    private fun getMerchantInfo(): JSONObject {
-        return JSONObject()
-                .put("merchantName", "Example Merchant")
+    private lateinit var googlePayConfig: GooglePayConfig
+    private val gson = Gson()
+
+    private val paymentsClient: PaymentsClient
+        get() = Wallet.getPaymentsClient(
+                activity,
+                Wallet.WalletOptions.Builder()
+                        .setEnvironment(googlePayConfig.getEnvironmentConstant())
+                        .build())
+
+    private var call: MethodCall? = null
+    private var result: Result? = null
+
+
+    /**
+     * All flutter method calls are communicated right here
+     */
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        this.call = call
+        this.result = result
+        when (call.method) {
+            "getPlatformVersion" -> result.success("Android ${android.os.Build.VERSION.RELEASE}")
+            CONFIGURE_GOOGLE_PAY -> configureGooglePay(call, result)
+            OPEN_GOOGLE_PAY_SETUP -> openGooglePaySetup(call, result)
+            OPEN_GOOGLE_PAY_TRANSACTION -> openGooglePayTransaction(call, result)
+            else -> result.notImplemented()
+        }
     }
 
-    fun getPaymentDataRequest(): JSONObject {
-        val paymentDataRequest = baseRequest
-        paymentDataRequest.put(
-                "allowedPaymentMethods",
-                JSONArray()
-                        .put(getCardPaymentMethod()))
-        paymentDataRequest.put("transactionInfo", getTransactionInfo())
-        paymentDataRequest.put("merchantInfo", getMerchantInfo())
+    private fun configureGooglePay(call: MethodCall, result: Result) {
+        if (!call.hasArgument(GOOGLE_PAY_CONFIG)) {
+            result.error(GOOGLE_PAY_CONFIG, "No google pay configuration set in argument of method call", Any())
+            throw IllegalStateException("No argument passed for $GOOGLE_PAY_CONFIG")
+        }
 
-        return paymentDataRequest
+        googlePayConfig = gson.fromJson(call.argument<String>(GOOGLE_PAY_CONFIG), GooglePayConfig::class.java)
+        googlePayConfig.checkConfiguration(result)
+
+        checkIsReadyToPay(call, result)
     }
 
-    private fun openGooglePaySetup() {
-        val request = PaymentDataRequest.fromJson(getPaymentDataRequest().toString())
-        request?.let {
+    private fun checkIsReadyToPay(call: MethodCall, flutterResult: Result) {
+        val request = IsReadyToPayRequest.fromJson(googlePayConfig.getIsReadyToPayRequest().toString())
+        val task = paymentsClient.isReadyToPay(request)
+        task.addOnCompleteListener { task ->
+            try {
+                val result = task.getResult(ApiException::class.java)!!
+                if (result) {
+                    // show Google Pay as a payment option
+                    flutterResult.success(true)
+                } else {
+                    flutterResult.error("Google Pay not available on device", "GP", result)
+                }
+            } catch (e: ApiException) {
+                flutterResult.success(false)
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        return when (requestCode) {
+            LOAD_PAYMENT_DATA_REQUEST_CODE -> {
+                handleGooglePayResult(resultCode, data)
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun handleGooglePayResult(resultCode: Int, data: Intent?) {
+        when (resultCode) {
+            Activity.RESULT_OK -> {
+                val intent = data ?: throw IllegalStateException("No data returned from google pay for successful callback")
+                val paymentData = PaymentData.getFromIntent(intent)
+                val json = paymentData?.toJson()
+                val paymentMethodData = JSONObject(json).getJSONObject("paymentMethodData")
+                val paymentToken = paymentMethodData
+                        .getJSONObject("tokenizationData")
+                        .getString("token")
+                result?.success(paymentToken)
+            }
+            Activity.RESULT_CANCELED -> {
+                result?.error("Google Pay Cancelled", "Google Pay was cancelled by the user", "")
+            }
+            AutoResolveHelper.RESULT_ERROR -> {
+                val status = AutoResolveHelper.getStatusFromIntent(data)
+                // Log the status for debugging.
+                // Generally, there is no need to show an error to the user.
+                // The Google Pay payment sheet will present any account errors.
+                result?.error(status?.status.toString(), status?.statusMessage, "Google Pay error")
+            }
+        }
+    }
+
+
+    /**
+     * this will only open up google pay for setup purposes and will not open the google pay picker to charge a user
+     */
+    private fun openGooglePaySetup(call: MethodCall, result: Result) {
+        val request = PaymentDataRequest.fromJson(googlePayConfig.getPaymentDataRequest().toString())
+        request?.let { paymentDataRequest ->
             AutoResolveHelper.resolveTask(
-                    paymentsClient.loadPaymentData(request),
+                    paymentsClient.loadPaymentData(paymentDataRequest),
                     activity,
                     LOAD_PAYMENT_DATA_REQUEST_CODE
             )
         }
+    }
+
+    private fun openGooglePayTransaction(call: MethodCall, result: Result) {
+        val transaction = gson.fromJson(call.argument<String>(GOOGLE_PAY_TRANSACTION), GooglePayTransaction::class.java)
+
+        val request = PaymentDataRequest.fromJson(googlePayConfig.getPaymentDataRequest(transaction).toString())
+        request?.let { paymentDataRequest ->
+            AutoResolveHelper.resolveTask(
+                    paymentsClient.loadPaymentData(paymentDataRequest),
+                    activity,
+                    LOAD_PAYMENT_DATA_REQUEST_CODE
+            )
+        }
+
     }
 }
