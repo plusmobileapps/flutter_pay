@@ -1,0 +1,33 @@
+{
+  "googlePayConfig": {
+    "environment": "test",
+    "allowedCards": [
+      "AMEX",
+      "DISCOVER",
+      "MASTERCARD",
+      "VISA"
+    ] ,
+    "allowedAuthMethods": [
+      "PAN_ONLY",
+      "CRYPTOGRAM_3DS"
+    ],
+    "merchantName": "Example merchantName",
+    "tokenizationSpecification": {
+      "type": "PAYMENT_GATEWAY",
+      "gateway": "example",
+      "gatewayMerchantId": "exampleMerchantId",
+      "protocolVersion": "",
+      "publicKey": ""
+    }
+  }
+}
+
+
+//Google pay transaction
+{
+  "googlePayTransactionInfo": {
+    "totalPrice": "12.34",
+    "totalPriceStatus": "FINAL",
+    "currencyCode": "USD"
+  }
+}
