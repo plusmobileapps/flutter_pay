@@ -15,11 +15,12 @@ import java.lang.IllegalStateException
  * @property allowedAuthMethods list of security authentication methods to be used with google pay for tokenization
  */
 data class GooglePayConfig(
-        private val environment: String,
         private val tokenizationSpecication: TokenizationSpecification?,
         private val allowedCards: List<String>?,
         private val allowedAuthMethods: List<String>?,
         private val merchantName: String?) {
+
+    var environment: String? = null
 
     val baseRequest: JSONObject
         get() = JSONObject().apply {
@@ -27,14 +28,11 @@ data class GooglePayConfig(
             put("apiVersionMinor", 0)
         }
 
-    fun checkConfiguration(flutterResult: MethodChannel.Result) {
-        getEnvironmentConstant()
-        getMerchantInfo()
-        when {
-            allowedCards.isNullOrEmpty() -> throw IllegalStateException("No cards set for the allowedCards configuration of google pay")
-            allowedAuthMethods.isNullOrEmpty() -> throw IllegalStateException("No allowedAuthMethods set on google pay configuration")
-        }
-    }
+    val isValidConfiguration: Boolean
+        get() = !(environment == null ||
+                allowedCards.isNullOrEmpty() ||
+                allowedAuthMethods.isNullOrEmpty() ||
+                merchantName == null)
 
     fun getEnvironmentConstant(): Int {
         return when (environment) {

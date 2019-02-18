@@ -38,6 +38,7 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _platformVersion = platformVersion;
     });
+    _loadConfigFile();
   }
 
   @override
@@ -54,7 +55,7 @@ class _MyAppState extends State<MyApp> {
             ),
             RaisedButton(
               child: Text("Open Google Pay"),
-              onPressed: checkIsAvailable,
+              onPressed: _loadConfigFile,
             )
           ],
         ),
@@ -68,4 +69,11 @@ class _MyAppState extends State<MyApp> {
     FlutterPay.openGooglePaySetup();
     return isAvailable;
   }
+
+  void _loadConfigFile() async {
+    String config = await rootBundle.loadString('assets/flutter_pay/flutter_pay_config.json');
+    bool isAvailable = await FlutterPay.loadConfigAndCheckAvailability(json: config);
+    print("Google Pay availability $isAvailable");
+  }
 }
+

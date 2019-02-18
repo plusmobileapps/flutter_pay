@@ -108,8 +108,14 @@ class FlutterPayPlugin(private val activity: Activity, registrar: Registrar) : M
             throw IllegalStateException("No argument passed for $GOOGLE_PAY_CONFIG")
         }
 
+        val environment = call.argument<String>("environment");
+
         googlePayConfig = gson.fromJson(call.argument<String>(GOOGLE_PAY_CONFIG), GooglePayConfig::class.java)
-        googlePayConfig.checkConfiguration(result)
+        googlePayConfig.environment = environment
+        if (!googlePayConfig.isValidConfiguration) {
+            result.error("Invalid Google Pay Configuration was passed in", "GP", "")
+            return
+        }
 
         checkIsReadyToPay(call, result)
     }

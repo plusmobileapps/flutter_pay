@@ -1,6 +1,6 @@
 {
+  "environment": "test",
   "googlePayConfig": {
-    "environment": "test",
     "allowedCards": [
       "AMEX",
       "DISCOVER",
@@ -19,15 +19,9 @@
       "protocolVersion": "",
       "publicKey": ""
     }
-  }
-}
+  },
 
-
-//Google pay transaction
-{
-  "googlePayTransactionInfo": {
-    "totalPrice": "12.34",
-    "totalPriceStatus": "FINAL",
-    "currencyCode": "USD"
+  "applePayConfig": {
+    "environment": "test"
   }
 }
