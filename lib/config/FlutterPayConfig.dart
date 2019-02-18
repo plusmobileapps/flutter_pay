@@ -1,5 +1,5 @@
-import 'GooglePayConfig.dart';
-import 'ApplePayConfig.dart';
+import 'package:flutter_pay/config/google_pay/GooglePayConfig.dart';
+import 'package:flutter_pay/config/apple_pay/ApplePayConfig.dart';
 import 'dart:convert';
 
 const _ENVIRONMENT = "environment";
