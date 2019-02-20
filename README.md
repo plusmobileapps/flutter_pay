@@ -10,3 +10,11 @@ The example app is very simple right now and simply has one button which when cl
 
 * Setting types of payment methods allowed
 * grabbing a payment token from Google Pay
+
+### Google Pay Resources
+
+[Google Pay API Overview](https://developers.google.com/pay/api/android/overview)
+
+[Google Pay JSON Object Reference](https://developers.google.com/pay/api/android/reference/object)
+
+[Google Pay Brand Design Guidelines](https://developers.google.com/pay/api/web/guides/brand-guidelines)

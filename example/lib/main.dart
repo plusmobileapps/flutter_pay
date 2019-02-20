@@ -3,77 +3,66 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_pay/flutter_pay.dart';
+import 'dart:io' show Platform;
+import 'package:flutter_pay/FlutterPayButton.dart';
+
 
 void main() => runApp(MyApp());
 
 class MyApp extends StatefulWidget {
+
+  bool isReadyCheckMade = false;
+  bool flutterPayIsAvailable = false;
+
   @override
   _MyAppState createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
-  }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      platformVersion = await FlutterPay.platformVersion;
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
-    });
-    _loadConfigFile();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isReadyCheckMade) {
+      checkIsAvailable();
+    }
+
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Flutter Pay'),
         ),
-        body: Row(
-          children: <Widget>[
-            Center(
-              child: Text('Running on: $_platformVersion\n'),
-            ),
-            RaisedButton(
-              child: Text("Open Google Pay"),
-              onPressed: _loadConfigFile,
-            )
-          ],
-        ),
+        body: _getBodyWidget(),
       ),
     );
   }
-  
-  Future<bool> checkIsAvailable() async {
-    bool isAvailable = await FlutterPay.checkIsReadyToPay;
-    print("Google pay is available:" + isAvailable.toString());
-    FlutterPay.openGooglePaySetup();
-    return isAvailable;
+
+  Widget _getBodyWidget() {
+    if (widget.flutterPayIsAvailable) {
+      return FlutterPayButon(buttonTheme: FlutterPayButtonTheme.BLACK, onClickListener: _onFlutterPayButtonClicked);
+    } else {
+      return Text('Google Pay is not available');
+    }
   }
 
-  void _loadConfigFile() async {
+
+  
+  Future<void> checkIsAvailable() async {
     String config = await rootBundle.loadString('assets/flutter_pay/flutter_pay_config.json');
     bool isAvailable = await FlutterPay.loadConfigAndCheckAvailability(json: config);
-    print("Google Pay availability $isAvailable");
+    setState(() {
+      widget.isReadyCheckMade = true;
+      widget.flutterPayIsAvailable = isAvailable;
+    });
+  }
+
+  void _onFlutterPayButtonClicked() {
+    FlutterPay.openGooglePaySetup();
   }
 }
 

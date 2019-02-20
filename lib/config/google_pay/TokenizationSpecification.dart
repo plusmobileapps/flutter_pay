@@ -1,4 +1,3 @@
-
 const _TYPE = "type";
 const _GATEWAY = "gateway";
 const _GATEWAY_MERCHANT_ID = "gatewayMerchantId";
@@ -12,25 +11,21 @@ class TokenizationSpecification {
   final String protocolVersion;
   final String publicKey;
 
-  TokenizationSpecification({this.type, this.gateway, this.gatewayMerchantId, this.protocolVersion, this.publicKey});
+  TokenizationSpecification(
+      {this.type,
+      this.gateway,
+      this.gatewayMerchantId,
+      this.protocolVersion,
+      this.publicKey});
 
-  factory TokenizationSpecification.fromJson(Map<String, dynamic> decodedJson) {
-    String type = decodedJson[_TYPE];
-    String gateway = decodedJson[_GATEWAY];
-    String gatewayMerchantId = decodedJson[_GATEWAY_MERCHANT_ID];
-    String protocolVersion = decodedJson[_PROTOCOL_VERSION];
-    String publicKey = decodedJson[_PUBLIC_KEY];
+  TokenizationSpecification.fromJson(Map<String, dynamic> decodedJson)
+      : type = decodedJson[_TYPE],
+        gateway = decodedJson[_GATEWAY],
+        gatewayMerchantId = decodedJson[_GATEWAY_MERCHANT_ID],
+        protocolVersion = decodedJson[_PROTOCOL_VERSION],
+        publicKey = decodedJson[_PUBLIC_KEY];
 
-    return new TokenizationSpecification(
-        type: type,
-        gateway: gateway,
-        gatewayMerchantId: gatewayMerchantId,
-        protocolVersion: protocolVersion,
-        publicKey: publicKey);
-  }
-
-  Map<String, dynamic> toJson() =>
-      {
+  Map<String, dynamic> toJson() => {
         _TYPE: type,
         _GATEWAY: gateway,
         _GATEWAY_MERCHANT_ID: gatewayMerchantId,

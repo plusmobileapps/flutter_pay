@@ -1,4 +1,6 @@
+import 'dart:core';
 import 'dart:convert';
+
 import 'TokenizationSpecification.dart';
 
 const _ALLOWED_CARDS = "allowedCards";
@@ -12,34 +14,38 @@ class GooglePayConfig {
   final String merchantName;
   final TokenizationSpecification tokenizationSpecification;
 
-  GooglePayConfig({this.allowedCards, this.allowedAuthMethods, this.merchantName, this.tokenizationSpecification});
+  GooglePayConfig(
+      {this.allowedCards,
+      this.allowedAuthMethods,
+      this.merchantName,
+      this.tokenizationSpecification});
 
-  factory GooglePayConfig.fromJson(Map<String, dynamic> decodedJson) {
-    List<String> allowedCards = new List();
-    List<String> allowedAuthMethods = new List();
-    for(var card in decodedJson[_ALLOWED_CARDS]) {
-      allowedCards.add(card);
-    }
+  GooglePayConfig.fromJson(Map<String, dynamic> json)
+      : allowedCards = _getAllowedCards(json),
+        allowedAuthMethods = _getAllowedAuthMethods(json),
+        merchantName = json[_MERCHANT_NAME],
+        tokenizationSpecification = TokenizationSpecification.fromJson(json);
 
-    for(var authMethod in decodedJson[_ALLOWED_AUTH_METHODS]) {
-      allowedAuthMethods.add(authMethod);
-    }
-
-    return new GooglePayConfig(
-      allowedCards: allowedCards,
-      allowedAuthMethods: allowedAuthMethods,
-      merchantName: decodedJson[_MERCHANT_NAME],
-      tokenizationSpecification: TokenizationSpecification.fromJson(decodedJson)
-    );
-  }
-
-  Map<String, dynamic> toJson() =>
-      {
+  Map<String, dynamic> toJson() => {
         _ALLOWED_CARDS: allowedCards,
         _ALLOWED_AUTH_METHODS: allowedAuthMethods,
         _MERCHANT_NAME: merchantName,
-        _TOKENIZATION_SPECIFICATION: jsonEncode(tokenizationSpecification)
+        _TOKENIZATION_SPECIFICATION: tokenizationSpecification
       };
+
+  static List<String> _getAllowedCards(Map<String, dynamic> json) {
+    List<String> allowedCards = new List();
+    for (var card in json[_ALLOWED_CARDS]) {
+      allowedCards.add(card);
+    }
+    return allowedCards;
+  }
+
+  static List<String> _getAllowedAuthMethods(Map<String, dynamic> json) {
+    List<String> allowedAuthMethods = new List();
+    for (var authMethod in json[_ALLOWED_AUTH_METHODS]) {
+      allowedAuthMethods.add(authMethod);
+    }
+    return allowedAuthMethods;
+  }
 }
-
-

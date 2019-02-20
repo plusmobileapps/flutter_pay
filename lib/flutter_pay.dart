@@ -14,7 +14,10 @@ class FlutterPay {
 
 
   static Future<bool> loadConfigAndCheckAvailability({json: String, environment: Environment}) async {
-    FlutterPayConfig flutterPayConfig = FlutterPayConfig.fromJson(json);
+    Map flutterPayConfigMap = jsonDecode(json);
+    FlutterPayConfig flutterPayConfig = FlutterPayConfig.fromJson(flutterPayConfigMap);
+    print(json);
+    print(jsonEncode(flutterPayConfig));
     String env = _getEnvironmentString(environment: environment);
     final bool paymentAvailable = await _channel.invokeMethod('configureGooglePay', {"googlePayConfig": jsonEncode(flutterPayConfig.googlePayConfig), "environment": env});
     return paymentAvailable;
